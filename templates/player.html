@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joueur - Quiz Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-light: #4CAF50;
+            --primary-dark: #2E7D32;
+            --secondary-light: #66BB6A;
+            --secondary-dark: #1B5E20;
+            --accent: #FFC107;
+            --accent-dark: #FFA000;
+            --light-bg: #f8f9fa;
+            --dark-bg: #2d3047;
+            --text-dark: #2d3047;
+            --text-light: #ffffff;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --success: #00c9a7;
+            --danger: #ff4757;
+        }
+        
+        body {
+            background: cornsilk;
+            color: var(--text-dark);
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .main-container {
+            background: var(--light-bg);
+            border-radius: 24px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+            margin: 20px;
+            position: relative;
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary-dark), var(--secondary-dark));
+            padding: 40px 30px;
+            text-align: center;
+            color: var(--text-light);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            z-index: 0;
+        }
+        
+        .content-area {
+            background: var(--light-bg);
+            padding: 40px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-light);
+            margin-bottom: 10px;
+            position: relative;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .lead {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 300;
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .form-control {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid rgba(123, 79, 255, 0.2);
+            color: var(--text-dark);
+            padding: 15px 20px;
+            border-radius: 16px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-light);
+            box-shadow: 0 0 0 0.25rem rgba(123, 79, 255, 0.25);
+        }
+        
+        .form-control::placeholder {
+            color: rgba(45, 48, 71, 0.5);
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 16px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background: var(--primary-light);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-light), var(--accent));
+            transition: height 0.3s ease;
+            z-index: -1;
+        }
+        
+        .btn-primary:hover::after {
+            height: 100%;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-success::after {
+            background: linear-gradient(90deg, var(--success), #00a58e);
+        }
+        
+        #buzzer {
+            width: 220px;
+            height: 220px;
+            background: linear-gradient(135deg, var(--primary-dark), var(--accent));
+            border-radius: 50%;
+            margin: 30px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border: 5px solid rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        #buzzer.active {
+            animation: pulse 1.5s infinite;
+        }
+
+        #buzzer.inactive {
+            background: #7f8c8d !important;
+            cursor: not-allowed;
+            animation: none;
+            box-shadow: none;
+        }
+        
+        .incorrect-buzzer {
+            animation: shake 0.5s ease-in-out;
+            background: var(--danger) !important;
+        }
+        
+        #buzzer.buzzed {
+            background: var(--success);
+            box-shadow: 0 0 25px rgba(0, 201, 167, 0.6);
+        }
+        
+        #buzzer:active {
+            transform: scale(0.95);
+        }
+
+        .score-update {
+            animation: scorePulse 0.5s ease;
+            color: var(--success) !important;
+        }
+
+        @keyframes scorePulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(123, 79, 255, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(123, 79, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(123, 79, 255, 0); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        #countdown {
+            font-size: 4.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin: 30px 0;
+            height: 100px;
+            color: var(--primary-dark);
+        }
+        
+        #score {
+            font-size: 2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-dark);
+        }
+        
+        .player-info {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .step {
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .status-message {
+            padding: 20px;
+            text-align: center;
+            border-radius: 12px;
+            margin: 20px 0;
+            background: var(--card-bg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .status-success {
+            border-left: 5px solid var(--success);
+        }
+        
+        .status-error {
+            border-left: 5px solid var(--danger);
+        }
+        
+        .wave-separator {
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            overflow: hidden;
+            line-height: 0;
+            transform: rotate(180deg);
+        }
+        
+        .wave-separator svg {
+            position: relative;
+            display: block;
+            width: calc(100% + 1.3px);
+            height: 50px;
+        }
+        
+        .wave-separator .shape-fill {
+            fill: var(--light-bg);
+        }
+        
+        @media (max-width: 768px) {
+            .content-area {
+                padding: 30px 20px;
+            }
+            
+            #buzzer {
+                width: 180px;
+                height: 180px;
+                font-size: 1.8rem;
+            }
+            
+            #countdown {
+                font-size: 3.5rem;
+            }
+            
+            #score {
+                font-size: 1.8rem;
+            }
+        }
+
+        /* Styles pour le footer */
+        .site-footer {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 30px;
+            padding: 15px 0;
+            text-align: center;
+            background-color: cornsilk;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .footer-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .footer-logo {
+            height: 20px;
+            width: auto;
+            opacity: 0.7;
+        }
+
+        .footer-text {
+            color: rgba(0,0,0,0.6);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header-gradient">
+            <div class="wave-separator">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" class="shape-fill"></path>
+                </svg>
+            </div>
+            <h1><i class="fas fa-gamepad me-3"></i>D1-QUIZ</h1>
+            <p class="lead" id="header-subtitle">Le jeu de quiz interactif</p>
+        </div>
+        
+        <div class="content-area">
+            <!-- Étape 1: Code de partie -->
+            <div id="gameCodeStep" class="step">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="gameCodeInput" 
+                           placeholder="Entrez le code de partie" maxlength="6" aria-label="Code de la partie">
+                </div>
+                <button class="btn btn-primary" onclick="joinGame()" aria-label="Rejoindre la partie">
+                    <i class="fas fa-sign-in-alt"></i> Rejoindre
+                </button>
+            </div>
+            
+            <!-- Étape 2: Nom du joueur -->
+            <div id="playerNameStep" class="step hidden">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="playerNameInput" 
+                           placeholder="Votre nom" aria-label="Votre nom de joueur">
+                </div>
+                <button class="btn btn-success" onclick="createPlayer()" aria-label="Commencer à jouer">
+                    <i class="fas fa-play"></i> Commencer
+                </button>
+            </div>
+            
+            <!-- Interface de jeu -->
+            <div id="gameInterface" class="step hidden">
+                <div id="score">Score: 0</div>
+                
+                <div id="buzzer" class="active" aria-label="Buzzer">
+                    <i class="fas fa-bell"></i> BUZZER
+                </div>
+                
+                <div id="countdown"></div>
+                
+                <div class="player-info">
+                    <div>Partie: <span id="gameCodeDisplay" class="fw-bold"></span></div>
+                    <div>Joueur: <span id="playerNameDisplay" class="fw-bold"></span></div>
+                    <div>Statut: <span id="buzzerStatus" class="fw-bold">Actif</span></div>
+                </div>
+                
+                <div id="statusMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            <img src="{{ url_for('static', filename='img/gemini.png') }}" 
+                 alt="Logo D1-Game" 
+                 class="footer-logo"
+                 onerror="this.style.display='none'">
+            <span class="footer-text">© 2025 D1-Game, Inc.</span>
+        </div>
+    </footer>
+
+    <script>
+        const socket = io();
+        let game_id = null;
+        let player_id = null;
+        let player_name = null;
+        const buzzer = document.getElementById('buzzer');
+        const countdownEl = document.getElementById('countdown');
+        const scoreEl = document.getElementById('score');
+        const buzzerStatusEl = document.getElementById('buzzerStatus');
+        const headerSubtitle = document.getElementById('header-subtitle');
+        
+        // Rejoindre une partie avec un code
+        function joinGame() {
+            game_id = document.getElementById('gameCodeInput').value.toUpperCase();
+            
+            if (game_id.length !== 6) {
+                showMessage('Le code doit contenir 6 caractères', 'error');
+                return;
+            }
+            
+            // Passer à l'étape suivante
+            document.getElementById('gameCodeStep').classList.add('hidden');
+            document.getElementById('playerNameStep').classList.remove('hidden');
+            headerSubtitle.textContent = 'Créez votre profil de joueur';
+        }
+        
+        // Créer un joueur
+        function createPlayer() {
+            player_name = document.getElementById('playerNameInput').value.trim();
+            
+            if (!player_name) {
+                showMessage('Veuillez entrer votre nom', 'error');
+                return;
+            }
+            
+            player_id = 'player_' + Math.random().toString(36).substr(2, 8);
+            
+            // Rejoindre la partie
+            socket.emit('join_game', {
+                game_id: game_id,
+                player_id: player_id,
+                name: player_name
+            });
+            
+            // Afficher l'interface de jeu
+            document.getElementById('playerNameStep').classList.add('hidden');
+            document.getElementById('gameInterface').classList.remove('hidden');
+            document.getElementById('playerNameDisplay').textContent = player_name;
+            document.getElementById('gameCodeDisplay').textContent = game_id;
+            headerSubtitle.textContent = 'En jeu - ' + player_name;
+        }
+        
+        // Gestion du game_state
+        socket.on('game_state', (game) => {
+            // Mettre à jour le score
+            if (game.players && game.players[player_id]) {
+                const newScore = game.players[player_id].score || 0;
+                scoreEl.textContent = `Score: ${newScore}`;
+            }
+
+            // Gestion du buzzer
+            const isActive = game.players && game.players[player_id] && 
+                            game.players[player_id].buzzer_active && 
+                            game.buzzer_enabled;
+            
+            if (isActive) {
+                buzzer.classList.add('active');
+                buzzer.classList.remove('inactive', 'buzzed');
+                buzzerStatusEl.textContent = 'Actif';
+                buzzerStatusEl.style.color = 'var(--primary-dark)';
+            } else {
+                buzzer.classList.remove('active');
+                buzzer.classList.add('inactive');
+                buzzerStatusEl.textContent = 'Inactif';
+                buzzerStatusEl.style.color = 'var(--danger)';
+            }
+        });
+
+        // Gestion du buzz
+        buzzer.addEventListener('click', () => {
+            if (buzzer.classList.contains('active')) {
+                socket.emit('buzz', {
+                    game_id: game_id,
+                    player_id: player_id
+                });
+                
+                // Feedback immédiat
+                buzzer.classList.remove('active');
+                buzzer.classList.add('buzzed');
+                buzzerStatusEl.textContent = 'Vous avez buzzé!';
+                buzzerStatusEl.style.color = 'var(--success)';
+            }
+        });
+
+        // Quand un joueur buzz
+        socket.on('player_buzzed', (data) => {
+            if (data.player_id !== player_id) {
+                // Désactiver le buzzer pour les autres joueurs
+                buzzer.classList.remove('active');
+                buzzer.classList.add('inactive');
+                buzzerStatusEl.textContent = 'Buzzer désactivé';
+                buzzerStatusEl.style.color = 'var(--danger)';
+            } else {
+                // Confirmation visuelle pour le joueur qui a buzzé
+                buzzer.classList.remove('active');
+                buzzer.classList.add('buzzed');
+                buzzerStatusEl.textContent = 'Vous avez buzzé!';
+                buzzerStatusEl.style.color = 'var(--success)';
+            }
+        });
+
+        // Quand la réponse est correcte
+        socket.on('answer_correct', (data) => {
+            if (data.player_id === player_id) {
+                showMessage('Réponse correcte! +1 point', 'success');
+            }
+            // Réactiver les buzzers pour tous
+            buzzer.classList.add('active');
+            buzzer.classList.remove('buzzed', 'inactive');
+            buzzerStatusEl.textContent = 'Actif';
+            buzzerStatusEl.style.color = 'var(--primary-dark)';
+        });
+
+        // Quand la réponse est incorrecte
+        socket.on('answer_incorrect', (data) => {
+            if (data.player_id === player_id) {
+                showMessage('Réponse incorrecte', 'error');
+                // Désactiver seulement ce buzzer
+                buzzer.classList.remove('active', 'buzzed');
+                buzzer.classList.add('inactive');
+                buzzerStatusEl.textContent = 'Inactif (mauvaise réponse)';
+                buzzerStatusEl.style.color = 'var(--danger)';
+            } else {
+                // Réactiver les buzzers des autres joueurs
+                buzzer.classList.add('active');
+                buzzer.classList.remove('inactive');
+                buzzerStatusEl.textContent = 'Actif';
+                buzzerStatusEl.style.color = 'var(--primary-dark)';
+            }
+        });
+
+        // Quand une nouvelle question commence
+        socket.on('new_question', () => {
+            // Réactiver tous les buzzers
+            buzzer.classList.add('active');
+            buzzer.classList.remove('buzzed', 'inactive');
+            buzzerStatusEl.textContent = 'Actif';
+            buzzerStatusEl.style.color = 'var(--primary-dark)';
+        });
+        
+        // Compte à rebours
+        socket.on('countdown', (data) => {
+            countdownEl.textContent = data.remaining;
+            
+            if (data.remaining <= 5) {
+                countdownEl.style.color = 'var(--danger)';
+            } else {
+                countdownEl.style.color = 'var(--primary-dark)';
+            }
+        });
+
+        socket.on('timeout', () => {
+            countdownEl.textContent = "0";
+            countdownEl.style.color = 'var(--danger)';
+            
+            setTimeout(() => {
+                countdownEl.textContent = "";
+            }, 2000);
+        });
+        
+        // Afficher un message temporaire
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('statusMessage');
+            messageEl.innerHTML = `
+                <div class="status-message status-${type}">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'times-circle'} me-2"></i>
+                    ${text}
+                </div>
+            `;
+            
+            setTimeout(() => {
+                messageEl.innerHTML = '';
+            }, 3000);
+        }
+
+        // Gestion de la reconnexion
+        socket.on('connect', () => {
+            if (game_id && player_id && player_name) {
+                socket.emit('join_game', {
+                    game_id: game_id,
+                    player_id: player_id,
+                    name: player_name
+                });
+            }
+        });
+    </script>
+</body>
+</html>

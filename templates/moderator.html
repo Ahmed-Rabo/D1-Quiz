@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modérateur - Quiz Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-light: #4CAF50;
+            --primary-dark: #2E7D32;
+            --secondary-light: #66BB6A;
+            --secondary-dark: #1B5E20;
+            --accent: #FFC107;
+            --success: #FFA000;
+            --danger: #f72585;
+            --light-bg: #f8f9fa;
+            --dark-bg: #2d3047;
+            --text-dark: #2d3047;
+            --text-light: #ffffff;
+            --card-bg: rgba(255, 255, 255, 0.9);
+        }
+        
+        body {
+            background: cornsilk;
+            color: var(--text-dark);
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .main-container {
+            background: var(--light-bg);
+            border-radius: 24px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+            max-width: 1200px;
+            width: 100%;
+            overflow: hidden;
+            margin: 20px auto;
+            position: relative;
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary-dark), var(--secondary-dark));
+            padding: 40px 30px;
+            text-align: center;
+            color: var(--text-light);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            z-index: 0;
+        }
+        
+        .content-area {
+            background: var(--light-bg);
+            padding: 40px;
+        }
+        
+        .game-code {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 5px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px 30px;
+            border-radius: 15px;
+            display: inline-block;
+            color: white;
+            margin: 15px 0;
+        }
+        
+        .control-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: none;
+            transition: all 0.3s ease;
+        }
+        
+        .control-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+        }
+        
+        .player-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .player-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .buzzer-active {
+            border-left: 5px solid var(--success);
+        }
+        
+        .buzzer-inactive {
+            border-left: 5px solid var(--danger);
+        }
+        
+        .buzzer-player {
+            background: rgba(76, 201, 240, 0.2);
+            border: 2px solid var(--success);
+            animation: pulse 1.5s infinite;
+        }
+        
+        .player-blocked {
+            background: rgba(247, 37, 133, 0.1);
+            border-left: 5px solid var(--danger);
+            opacity: 0.7;
+            position: relative;
+        }
+        
+        .player-blocked::after {
+            content: "Bloqué";
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--danger);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 201, 240, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 201, 240, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 201, 240, 0); }
+        }
+        
+        .question-display {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 25px;
+            min-height: 250px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .answer-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .answer-item:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+        
+        .correct-answer {
+            background: rgba(46, 204, 113, 0.2);
+            border: 2px solid #2ecc71;
+            animation: pulse-correct 1.5s infinite;
+            font-weight: bold;
+        }
+        
+        @keyframes pulse-correct {
+            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+        }
+        
+        .btn-action {
+            font-weight: bold;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            border: none;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            border: none;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border: none;
+        }
+        
+        .btn-ask-question {
+            background: linear-gradient(135deg, #6c5ce7, #4a3ac9);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-ask-question:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(108, 92, 231, 0.4);
+        }
+        
+        .btn-ask-question::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                to bottom right,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.1) 45%,
+                rgba(255, 255, 255, 0.1) 55%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            transform: rotate(30deg);
+            animation: shine 3s infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) rotate(30deg); }
+            100% { transform: translateX(100%) rotate(30deg); }
+        }
+        
+        .countdown-display {
+            font-size: 4rem;
+            font-weight: 800;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .section-title {
+            position: relative;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+        
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: var(--primary-dark);
+            border-radius: 3px;
+        }
+        
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .difficulty-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: var(--text-dark);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .difficulty-btn.active {
+            background: var(--primary-dark);
+            color: white;
+            border-color: var(--primary-dark);
+        }
+        
+        .buzzer-info {
+            background: rgba(76, 201, 240, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            border: 2px solid var(--success);
+            display: none;
+        }
+        
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        /* Styles pour les onglets de navigation */
+        .nav-tabs {
+            border-bottom: 2px solid #dee2e6;
+            margin-bottom: 20px;
+        }
+        
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--text-dark);
+            font-weight: 500;
+            padding: 12px 20px;
+            margin-right: 5px;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            border-color: transparent;
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        
+        .nav-tabs .nav-link.active {
+            color: var(--primary-dark);
+            background-color: var(--card-bg);
+            border-bottom: 3px solid var(--primary-dark);
+            font-weight: 700;
+        }
+        
+        .tab-content {
+            padding: 20px 0;
+        }
+        
+        /* Effet de vague de séparation */
+        .wave-separator {
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            overflow: hidden;
+            line-height: 0;
+            transform: rotate(180deg);
+        }
+        
+        .wave-separator svg {
+            position: relative;
+            display: block;
+            width: calc(100% + 1.3px);
+            height: 50px;
+        }
+        
+        .wave-separator .shape-fill {
+            fill: var(--light-bg);
+        }
+        
+        /* Réorganisation pour petits écrans */
+        @media (max-width: 768px) {
+            .content-area {
+                padding: 25px 15px;
+            }
+            
+            .game-code {
+                font-size: 1.8rem;
+                padding: 10px 20px;
+            }
+            
+            .players-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .countdown-display {
+                font-size: 3rem;
+            }
+            
+            .question-display {
+                min-height: auto;
+                padding: 20px;
+            }
+            
+            .control-card {
+                padding: 20px;
+            }
+            
+            .btn-action, .btn-ask-question {
+                padding: 10px 15px;
+                font-size: 1rem;
+            }
+            
+            .difficulty-selector {
+                flex-direction: column;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .header-gradient {
+                padding: 30px 15px;
+            }
+            
+            .game-code {
+                font-size: 1.5rem;
+                letter-spacing: 3px;
+            }
+            
+            .content-area {
+                padding: 15px 10px;
+            }
+            
+            .section-title {
+                font-size: 1.3rem;
+            }
+            
+            .countdown-display {
+                font-size: 2.5rem;
+            }
+        }
+
+        /* Styles pour le footer */
+        .site-footer {
+            width: 100%;
+            max-width: 1200px;
+            margin: 30px auto 0;
+            padding: 15px 0;
+            text-align: center;
+            background-color: cornsilk;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .site-footer .container {
+            background-color: cornsilk;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .site-footer img {
+            width: 20px;
+            height: 20px;
+            opacity: 0.7;
+            margin-right: 8px;
+        }
+
+        .site-footer .text-muted {
+            color: rgba(0,0,0,0.6) !important;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header-gradient">
+            <div class="wave-separator">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" class="shape-fill"></path>
+                </svg>
+            </div>
+            <h1><i class="fas fa-crown me-3"></i>D1-QUIZ MASTER</h1>
+            <p class="lead">Panel de contrôle du modérateur</p>
+            <div class="game-code text-center mb-3">{{ game_id }}</div>
+        </div>
+        
+        <div class="content-area">
+            <!-- Onglets de navigation -->
+            <ul class="nav nav-tabs" id="moderatorTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="generation-tab" data-bs-toggle="tab" data-bs-target="#generation" type="button" role="tab">
+                        <i class="fas fa-users-cog me-2"></i>Génération & Joueurs
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="questions-tab" data-bs-toggle="tab" data-bs-target="#questions" type="button" role="tab">
+                        <i class="fas fa-question-circle me-2"></i>Questions & Timer
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="moderatorTabsContent">
+                <!-- Premier onglet - Génération et Joueurs -->
+                <div class="tab-pane fade show active" id="generation" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="control-card">
+                                <h3 class="section-title"><i class="fas fa-brain me-2"></i>Génération des Questions</h3>
+                                <div class="mb-3">
+                                    <label class="form-label">Thèmes du Quiz (séparés par des virgules)</label>
+                                    <input type="text" class="form-control mb-3" id="themesInput" placeholder="Ex: Histoire, Science, Cinéma">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Niveau de difficulté</label>
+                                        <div class="difficulty-selector">
+                                            <div class="difficulty-btn active" data-level="facile" onclick="selectDifficulty('facile')">Facile</div>
+                                            <div class="difficulty-btn" data-level="moyen" onclick="selectDifficulty('moyen')">Moyen</div>
+                                            <div class="difficulty-btn" data-level="difficile" onclick="selectDifficulty('difficile')">Difficile</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="w-75">
+                                            <label class="form-label">Nombre de questions par thème</label>
+                                            <input type="range" class="form-range" min="1" max="10" value="3" id="questionCount">
+                                            <div class="text-center"><span id="countValue">3</span> questions</div>
+                                        </div>
+                                        <div class="w-25 mt-4">
+                                            <button class="btn btn-primary btn-action w-100" onclick="generateQuestions()">
+                                                <i class="fas fa-bolt me-2"></i>Générer
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="generationStatus" class="text-center my-4"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="control-card">
+                                <h3 class="section-title"><i class="fas fa-users me-2"></i>Joueurs Connectés</h3>
+                                <div class="buzzer-info" id="buzzerPlayerInfo"></div>
+                                <div class="players-grid" id="playersList">
+                                    <div class="text-center py-4">
+                                        <p class="text-muted">
+                                            <i class="fas fa-user-clock fa-2x mb-3"></i><br>
+                                            En attente des joueurs...
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Deuxième onglet - Questions et Timer -->
+                <div class="tab-pane fade" id="questions" role="tabpanel">
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="control-card" id="questionsContainer" style="display: none;">
+                                <h3 class="section-title"><i class="fas fa-list me-2"></i>Questions Générées</h3>
+                                <div id="questionsList"></div>
+                                <div class="d-flex gap-3 mt-3">
+                                    <button class="btn btn-success btn-action flex-grow-1" onclick="enableBuzzer()">
+                                        <i class="fas fa-play-circle me-2"></i>Activer Buzzer
+                                    </button>
+                                    <button class="btn btn-danger btn-action flex-grow-1" onclick="disableBuzzer()">
+                                        <i class="fas fa-stop-circle me-2"></i>Désactiver
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-lg-6">
+                            <div class="control-card text-center">
+                                <h3 class="section-title"><i class="fas fa-stopwatch me-2"></i>Compte à Rebours</h3>
+                                <div class="countdown-display" id="countdownDisplay">--</div>
+                                <div class="d-grid gap-3">
+                                    <button class="btn btn-success btn-action" onclick="markCorrect()">
+                                        <i class="fas fa-check-circle me-2"></i>Réponse Correcte (+1)
+                                    </button>
+                                    <button class="btn btn-danger btn-action" onclick="markIncorrect()">
+                                        <i class="fas fa-times-circle me-2"></i>Réponse Incorrecte
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container text-center py-2">
+            <div class="d-flex justify-content-center align-items-center">
+                <img src="{{ url_for('static', filename='img/gemini.png') }}" 
+                     alt="Logo" 
+                     class="me-2"
+                     onerror="this.style.display='none'">
+                <span class="text-muted small">© 2025 D1-Game, Inc.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const socket = io();
+        const game_id = "{{ game_id }}";
+        let buzzerEnabled = false;
+        let generatedQuestions = {};
+        let currentDifficulty = "facile";
+        let buzzerPlayerId = null;
+        let buzzerPlayerName = null;
+        let blockedPlayers = [];
+        let currentGameState = {};
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const countSlider = document.getElementById('questionCount');
+            const countValue = document.getElementById('countValue');
+            countValue.textContent = countSlider.value;
+            
+            countSlider.addEventListener('input', () => {
+                countValue.textContent = countSlider.value;
+            });
+            
+            // Initialiser les onglets Bootstrap
+            const tabElms = document.querySelectorAll('button[data-bs-toggle="tab"]');
+            tabElms.forEach(tabEl => {
+                tabEl.addEventListener('shown.bs.tab', (event) => {
+                    // Vous pouvez ajouter du code ici pour gérer le changement d'onglet si nécessaire
+                });
+            });
+            
+            socket.emit('join_game', {
+                game_id: game_id,
+                player_id: 'moderator',
+                name: 'Modérateur'
+            });
+        });
+        
+        socket.on('game_state', updateGameState);
+        socket.on('countdown', updateCountdown);
+        socket.on('timeout', handleTimeout);
+        socket.on('player_buzzed', handlePlayerBuzzed);
+        socket.on('timer_stopped', handleTimerStopped);
+        
+    
+        
+        function selectDifficulty(level) {
+            currentDifficulty = level;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.difficulty-btn[data-level="${level}"]`).classList.add('active');
+        }
+        
+        async function generateQuestions() {
+            const themes = document.getElementById('themesInput').value;
+            const count = document.getElementById('questionCount').value;
+            
+            if (!themes) {
+                alert('Veuillez entrer au moins un thème');
+                return;
+            }
+            
+            const statusEl = document.getElementById('generationStatus');
+            statusEl.innerHTML = `
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                    <div class="spinner-border text-primary"></div>
+                    <div>Génération des questions en cours...</div>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch('/api/generate_questions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        themes: themes,
+                        difficulty: currentDifficulty,
+                        count: count
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    generatedQuestions = result.questions;
+                    displayQuestions();
+                    // Basculer automatiquement vers l'onglet des questions
+                    const questionsTab = new bootstrap.Tab(document.getElementById('questions-tab'));
+                    questionsTab.show();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                statusEl.innerHTML = '<div class="alert alert-danger">Erreur lors de la génération</div>';
+            } finally {
+                setTimeout(() => {
+                    statusEl.innerHTML = '';
+                }, 3000);
+            }
+        }
+        
+        function displayQuestions() {
+            const container = document.getElementById('questionsContainer');
+            const list = document.getElementById('questionsList');
+            container.style.display = 'block';
+            list.innerHTML = '';
+            
+            for (const theme in generatedQuestions) {
+                const themeQuestions = generatedQuestions[theme];
+                const themeContainer = document.createElement('div');
+                themeContainer.className = 'mb-4';
+                
+                themeContainer.innerHTML = `
+                    <h5 class="mb-3 text-primary">${theme}</h5>
+                    <div id="questions-${theme.replace(/\s+/g, '-')}" class="accordion"></div>
+                `;
+                
+                list.appendChild(themeContainer);
+                
+                const questionsContainer = themeContainer.querySelector(`#questions-${theme.replace(/\s+/g, '-')}`);
+                
+                themeQuestions.forEach((question, index) => {
+                    const difficultyClass = 
+                        question.difficulty === 'facile' ? 'bg-success' :
+                        question.difficulty === 'moyen' ? 'bg-warning' : 'bg-danger';
+                    
+                    const item = document.createElement('div');
+                    item.className = 'accordion-item mb-2';
+                    item.innerHTML = `
+                        <div class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#question-${theme.replace(/\s+/g, '-')}-${index}">
+                                <div class="d-flex justify-content-between w-100">
+                                    <span>Question #${index + 1}</span>
+                                    <span class="badge ${difficultyClass}">${question.difficulty}</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div id="question-${theme.replace(/\s+/g, '-')}-${index}" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <p>${question.text}</p>
+                                <div class="answers-container mb-3">
+                                    ${question.answers.map((answer, i) => `
+                                        <div class="answer-item ${i === question.correct ? 'correct-answer' : ''}">
+                                            ${i + 1}. ${answer}
+                                            ${i === question.correct ? '<span class="badge bg-success ms-2"><i class="fas fa-check"></i> Correcte</span>' : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button class="btn btn-ask-question w-100" onclick="askQuestion('${theme}', ${index})">
+                                    <i class="fas fa-question-circle me-2"></i>Poser cette question
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    questionsContainer.appendChild(item);
+                });
+            }
+        }
+
+        async function askQuestion(theme, question_index) {
+            try {
+                await fetch('/api/ask_question', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        theme: theme,
+                        question_index: question_index
+                    })
+                });
+                
+                blockedPlayers = [];
+                updateGameState(currentGameState);
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+
+        async function toggleBuzzerState(state) {
+            try {
+                await fetch('/api/activate_buzzer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        state: state 
+                    })
+                });
+                buzzerEnabled = state;
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+        
+        function enableBuzzer() {
+            if (!buzzerEnabled) {
+                toggleBuzzerState(true);
+            }
+        }
+        
+        function disableBuzzer() {
+            if (buzzerEnabled) {
+                toggleBuzzerState(false);
+            }
+        }
+        
+        function updateGameState(game) {
+            currentGameState = game;
+            buzzerEnabled = game.buzzer_enabled || false;
+            buzzerPlayerId = game.buzzer_player || null;
+            updatePlayersList(game.players || {});
+            
+            if (!buzzerPlayerId) {
+                document.getElementById('buzzerPlayerInfo').textContent = '';
+                document.getElementById('buzzerPlayerInfo').style.display = 'none';
+            }
+        }
+        
+        function handlePlayerBuzzed(data) {
+            buzzerPlayerId = data.player_id;
+            buzzerPlayerName = data.player_name;
+            
+            const buzzerInfo = document.getElementById('buzzerPlayerInfo');
+            buzzerInfo.textContent = `${buzzerPlayerName} a buzzé!`;
+            buzzerInfo.style.display = 'block';
+            
+            // Bloquer automatiquement tous les autres joueurs
+            for (const playerId in currentGameState.players) {
+                if (playerId !== buzzerPlayerId && playerId !== 'moderator') {
+                    if (!blockedPlayers.includes(playerId)) {
+                        blockedPlayers.push(playerId);
+                    }
+                }
+            }
+            
+            updatePlayersList(currentGameState.players);
+        }
+        
+        function updatePlayersList(players) {
+            const list = document.getElementById('playersList');
+            list.innerHTML = '';
+            
+            for (const playerId in players) {
+                const player = players[playerId];
+                if (playerId === 'moderator') continue;
+                
+                const isBuzzerPlayer = playerId === buzzerPlayerId;
+                const isActive = player.buzzer_active && !blockedPlayers.includes(playerId);
+                const isBlocked = blockedPlayers.includes(playerId);
+                
+                const playerCard = document.createElement('div');
+                playerCard.className = `player-card ${isActive && !isBlocked ? 'buzzer-active' : 'buzzer-inactive'} 
+                                      ${isBuzzerPlayer ? 'buzzer-player' : ''} ${isBlocked ? 'player-blocked' : ''}`;
+                
+                playerCard.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">${player.name}</h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-star text-warning"></i>
+                                <span class="fw-bold">${player.score} points</span>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-success" onclick="adjustScore('${playerId}', 1)">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="adjustScore('${playerId}', -1)">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                list.appendChild(playerCard);
+            }
+            
+            if (list.children.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-4">
+                        <p class="text-muted">
+                            <i class="fas fa-user-clock fa-2x mb-3"></i><br>
+                            En attente des joueurs...
+                        </p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function adjustScore(playerId, delta) {
+            try {
+                const response = await fetch('/api/update_score', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        player_id: playerId, 
+                        delta: delta 
+                    })
+                });
+
+                if (!response.ok) throw new Error('Erreur serveur');
+
+                const player = currentGameState.players?.[playerId];
+                if (player) {
+                    player.score = (player.score || 0) + delta;
+                    updatePlayersList(currentGameState.players);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert("Erreur lors de la modification du score");
+            }
+        }
+        
+        async function markCorrect() {
+            if (!buzzerPlayerId) {
+                alert("Aucun joueur n'a buzzé !");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/answer_result', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        player_id: buzzerPlayerId,
+                        is_correct: true
+                    })
+                });
+
+                if (response.ok) {
+                    blockedPlayers = [];
+                    await toggleBuzzerState(true);
+                    buzzerPlayerId = null;
+                    updateGameState(currentGameState);
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert("Erreur lors de l'envoi de la réponse");
+            }
+        }
+
+        async function markIncorrect() {
+            if (!buzzerPlayerId) {
+                alert('Aucun joueur n\'a buzzé !');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/answer_result', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        game_id: game_id,
+                        player_id: buzzerPlayerId,
+                        is_correct: false
+                    })
+                });
+
+                if (response.ok) {
+                    blockedPlayers = [buzzerPlayerId];
+                    await toggleBuzzerState(true);
+                    buzzerPlayerId = null;
+                    updateGameState(currentGameState);
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+                alert("Erreur lors de l'envoi de la réponse");
+            }
+        }
+        
+        function resetBuzzerSystem() {
+            fetch('/api/reset_buzzer', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ game_id: game_id })
+            }).then(() => {
+                buzzerPlayerId = null;
+                document.getElementById('buzzerPlayerInfo').style.display = 'none';
+                document.getElementById('countdownDisplay').textContent = '--';
+            });
+        }
+        
+        function updateCountdown(data) {
+            const display = document.getElementById('countdownDisplay');
+            display.textContent = data.remaining;
+            display.className = data.remaining <= 5 
+                ? 'countdown-display text-danger' 
+                : 'countdown-display text-success';
+        }
+        
+        function handleTimeout() {
+            const display = document.getElementById('countdownDisplay');
+            display.textContent = '0';
+            display.className = 'countdown-display text-danger';
+            
+            setTimeout(() => {
+                display.textContent = '--';
+                display.className = 'countdown-display';
+            }, 2000);
+        }
+        
+        function handleTimerStopped() {
+            const display = document.getElementById('countdownDisplay');
+            display.textContent = '--';
+            display.className = 'countdown-display';
+        }
+    </script>
+</body>
+</html>

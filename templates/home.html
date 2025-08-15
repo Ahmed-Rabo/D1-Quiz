@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Game - Accueil</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-light: #4CAF50;
+            --primary-dark: #2E7D32;
+            --secondary-light: #66BB6A;
+            --secondary-dark: #1B5E20;
+            --accent: #FFC107;
+            --accent-dark: #FFA000;
+            --light-bg: #f8f9fa;
+            --dark-bg: #263238;
+            --text-dark: #263238;
+            --text-light: #ffffff;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --gradient-angle: 135deg;
+        }
+        
+        body {
+            background: cornsilk;
+            color: var(--text-dark);
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .main-container {
+            background: var(--light-bg);
+            border-radius: 24px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+            max-width: 1000px;
+            width: 100%;
+            overflow: hidden;
+            margin: 20px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header-gradient {
+            background: linear-gradient(var(--gradient-angle), var(--primary-dark), var(--secondary-dark));
+            padding: 40px 30px;
+            text-align: center;
+            color: var(--text-light);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            z-index: 0;
+            animation: pulse 15s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .content-area {
+            background: var(--light-bg);
+            padding: 40px;
+        }
+        
+        .btn-choice {
+            padding: 30px 25px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            border-radius: 16px;
+            margin: 20px 0;
+            transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 220px;
+            background: var(--card-bg);
+            border: none;
+            color: var(--text-dark);
+            text-decoration: none;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+        
+        .btn-choice::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-light), var(--accent));
+            transition: height 0.3s ease;
+            z-index: -1;
+        }
+        
+        .btn-choice:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            color: var(--text-dark);
+        }
+        
+        .btn-choice:hover::after {
+            height: 100%;
+            opacity: 0.9;
+        }
+        
+        .btn-choice i {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(var(--gradient-angle), var(--primary-dark), var(--accent-dark));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            transition: transform 0.3s ease;
+        }
+        
+        .btn-choice:hover i {
+            transform: scale(1.1);
+        }
+        
+        .btn-moderator::after {
+            background: linear-gradient(90deg, var(--primary-dark), #00BFA5);
+        }
+        
+        .btn-player::after {
+            background: linear-gradient(90deg, var(--accent), #FF6D00);
+        }
+        
+        .features {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 50px;
+            flex-wrap: wrap;
+        }
+        
+        .feature {
+            text-align: center;
+            width: 30%;
+            min-width: 250px;
+            margin: 15px;
+            padding: 30px 25px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature i {
+            font-size: 2.8rem;
+            margin-bottom: 20px;
+            background: linear-gradient(var(--gradient-angle), var(--primary-dark), var(--accent-dark));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        h1 {
+            font-size: 3.8rem;
+            font-weight: 700;
+            color: var(--text-light);
+            margin-bottom: 10px;
+            position: relative;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+        }
+        
+        .lead {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            font-weight: 300;
+            color: rgba(255,255,255,0.9);
+            z-index: 1;
+            position: relative;
+        }
+        
+        .feature h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+        }
+        
+        .feature p {
+            opacity: 0.8;
+            font-weight: 300;
+            line-height: 1.6;
+            color: var(--text-dark);
+        }
+        
+        .btn-description {
+            opacity: 0.8;
+            font-weight: 300;
+            line-height: 1.7;
+            max-width: 350px;
+            margin: 0 auto;
+            color: var(--text-dark);
+        }
+        
+        @media (max-width: 768px) {
+            .btn-choice {
+                height: auto;
+                padding: 25px 20px;
+            }
+            
+            .features {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .feature {
+                width: 100%;
+                max-width: 350px;
+            }
+            
+            h1 {
+                font-size: 2.8rem;
+            }
+            
+            .header-gradient {
+                padding: 30px 20px;
+            }
+            
+            .content-area {
+                padding: 30px 20px;
+            }
+        }
+        
+        .wave-separator {
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            overflow: hidden;
+            line-height: 0;
+            transform: rotate(180deg);
+            z-index: 2;
+        }
+        
+        .wave-separator svg {
+            position: relative;
+            display: block;
+            width: calc(100% + 1.3px);
+            height: 60px;
+        }
+        
+        .wave-separator .shape-fill {
+            fill: var(--light-bg);
+        }
+
+        .glow-effect {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            filter: blur(20px);
+            z-index: 0;
+            animation: float 8s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        /* Styles pour le footer */
+        .site-footer {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: auto;
+            padding: 15px 0;
+            text-align: center;
+            background-color: cornsilk;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .site-footer .container {
+            background-color: cornsilk;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .site-footer img {
+            width: 20px;
+            height: 20px;
+            opacity: 0.7;
+            margin-right: 8px;
+        }
+
+        .site-footer .text-muted {
+            color: rgba(0,0,0,0.6) !important;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="header-gradient">
+            <div class="glow-effect" style="top: 20%; left: 10%;"></div>
+            <div class="glow-effect" style="top: 60%; right: 15%; animation-delay: 2s;"></div>
+            <div class="wave-separator">
+                <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" class="shape-fill"></path>
+                </svg>
+            </div>
+            <h1><i class="fas fa-gamepad me-3"></i>D1 GAME</h1>
+            <p class="lead">Le jeu de quiz interactif nouvelle génération</p>
+        </div>
+        
+        <div class="content-area">
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <a href="/moderator" class="btn-choice btn-moderator">
+                        <i class="fas fa-crown"></i>
+                        Créer une partie
+                    </a>
+                    <p class="text-center mt-3 btn-description">
+                        En tant que modérateur, créez et gérez la partie en temps réel.<br>
+                        Générez des questions dynamiques et contrôlez l'expérience de jeu.
+                    </p>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <a href="/player" class="btn-choice btn-player">
+                        <i class="fas fa-user-astronaut"></i>
+                        Rejoindre une partie
+                    </a>
+                    <p class="text-center mt-3 btn-description">
+                        En tant que joueur, rejoignez avec un code unique.<br>
+                        Répondez en temps réel et montez dans le classement!
+                    </p>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <i class="fas fa-infinity"></i>
+                    <h3>Thèmes Illimités</h3>
+                    <p>Des questions adaptables à tous les sujets et niveaux</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-fire-alt"></i>
+                    <h3>Mode Compétitif</h3>
+                    <p>Classement en temps réel avec bonus de rapidité</p>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-robot"></i>
+                    <h3>Intelligence Adaptative</h3>
+                    <p>Difficulté qui s'ajuste au niveau des joueurs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="site-footer">
+        <div class="container text-center py-2">
+            <div class="d-flex justify-content-center align-items-center">
+                <img src="{{ url_for('static', filename='img/gemini.png') }}" 
+                     alt="Logo" 
+                     class="me-2"
+                     onerror="this.style.display='none'">
+                <span class="text-muted small">© 2025 D1-Game, Inc.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            
+            if (!prefersReducedMotion) {
+                const animateElements = (elements, delay = 0) => {
+                    elements.forEach((el, i) => {
+                        el.style.transition = 'none';
+                        el.style.transform = 'translateY(30px)';
+                        el.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            el.style.transition = `transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${i*0.1}s, opacity 0.6s ease ${i*0.1}s`;
+                            el.style.transform = 'translateY(0)';
+                            el.style.opacity = '1';
+                        }, delay);
+                    });
+                };
+                
+                animateElements(document.querySelectorAll('.btn-choice'));
+                animateElements(document.querySelectorAll('.feature'), 200);
+                
+                const wave = document.querySelector('.wave-separator svg path');
+                if (wave) {
+                    const pathLength = wave.getTotalLength();
+                    wave.style.strokeDasharray = pathLength;
+                    wave.style.strokeDashoffset = pathLength;
+                    
+                    setTimeout(() => {
+                        wave.style.transition = 'stroke-dashoffset 1.5s ease-out';
+                        wave.style.strokeDashoffset = '0';
+                    }, 500);
+                }
+            }
+
+            window.addEventListener('mousemove', (e) => {
+                if (!prefersReducedMotion) {
+                    const glowElements = document.querySelectorAll('.glow-effect');
+                    const x = e.clientX / window.innerWidth;
+                    const y = e.clientY / window.innerHeight;
+                    
+                    glowElements.forEach((glow, index) => {
+                        const moveX = (x * 20 - 10) * (index % 2 === 0 ? 1 : -1);
+                        const moveY = (y * 20 - 10) * (index % 2 === 0 ? -1 : 1);
+                        glow.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
