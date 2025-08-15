@@ -38,24 +38,14 @@ OPENROUTER_API_KEY = "sk-or-v1-ef1e6a8f194d30aa9189fa3ebcb3b872952b73024b40ccb51
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_TIMEOUT = 15
 
-# Configuration Firebase - MODIFIÉ POUR RENDER
+# Configuration Firebase - CORRIGÉE POUR RENDER
 def initialize_firebase():
-    if os.getenv('RENDER'):
-        firebase_credentials = {
-            "type": "service_account",
-            "project_id": os.getenv('FIREBASE_PROJECT_ID'),
-            "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID'),
-            "private_key": os.getenv('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
-            "client_email": os.getenv('FIREBASE_CLIENT_EMAIL'),
-            "client_id": os.getenv('FIREBASE_CLIENT_ID'),
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_X509_CERT_URL'),
-            "universe_domain": "googleapis.com"
-        }
-        cred = credentials.Certificate(firebase_credentials)
+    if os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'):
+        # Production (Render) - utilise variable d'environnement
+        creds_info = json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS_JSON'])
+        cred = credentials.Certificate(creds_info)
     else:
+        # Local - utilise fichier
         cred = credentials.Certificate("credentials.json")
     
     firebase_admin.initialize_app(cred, {
@@ -519,11 +509,12 @@ def health_check():
         'active_connections': len(socketio.server.manager.rooms) if hasattr(socketio.server, 'manager') else 0
     })
 
-if __name__ == '__main__':
-    # Préchargement initial du cache
-    all_games = ref_games.get() or {}
-    for game_id, game_data in all_games.items():
-        games_cache[game_id] = game_data
+# Préchargement initial du cache au démarrage
+all_games = ref_games.get() or {}
+for game_id, game_data in all_games.items():
+    games_cache[game_id] = game_data
 
+if __name__ == '__main__':
+    # Développement local uniquement
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, debug=False, host='0.0.0.0', port=port)
+    socketio.run(app, debug=True, host='0.0.0.0', port=port)
