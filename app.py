@@ -5,6 +5,8 @@ import uuid
 import re
 import random
 import string
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 import firebase_admin
@@ -16,6 +18,7 @@ import psutil
 
 # Initialisation de l'application
 app = Flask(__name__)
+socketio = SocketIO(app, async_mode='eventlet')
 app.secret_key = os.urandom(24)
 
 # Configuration optimisée de Socket.IO avec async_mode='threading'
