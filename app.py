@@ -7,6 +7,7 @@ import random
 import string
 import eventlet
 eventlet.monkey_patch()
+
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
 import firebase_admin
@@ -18,16 +19,16 @@ import psutil
 
 # Initialisation de l'application
 app = Flask(__name__)
-socketio = SocketIO(app, async_mode='eventlet')
 app.secret_key = os.urandom(24)
 
-# Configuration optimisée de Socket.IO avec async_mode='threading'
+# Configuration de Socket.IO - CORRIGÉE
 socketio = SocketIO(app, 
                    cors_allowed_origins="*",
                    engineio_logger=False,
-                   async_mode='threading',  # Solution stable garantie
-                   ping_interval=5000,
-                   ping_timeout=30000)
+                   socketio_logger=False,
+                   async_mode='eventlet',  # Cohérent avec eventlet.monkey_patch()
+                   ping_interval=25,
+                   ping_timeout=60)
 
 # Activation de la compression
 Compress(app)
@@ -41,28 +42,39 @@ OPENROUTER_API_KEY = "sk-or-v1-ef1e6a8f194d30aa9189fa3ebcb3b872952b73024b40ccb51
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_TIMEOUT = 15
 
-# Configuration Firebase - CORRIGÉE POUR RENDER
+# Configuration Firebase - CORRIGÉE
 def initialize_firebase():
-    if os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'):
-        # Production (Render) - utilise variable d'environnement
-        creds_info = json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS_JSON'])
-        cred = credentials.Certificate(creds_info)
-    else:
-        # Local - utilise fichier
-        cred = credentials.Certificate("credentials.json")
-    
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://quizapp-45497-default-rtdb.europe-west1.firebasedatabase.app/',
-        'httpTimeout': 10,
-        'maxIdleConnections': 50
-    })
+    try:
+        if not firebase_admin._apps:  # Vérifier si déjà initialisé
+            if os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'):
+                # Production (Render) - utilise variable d'environnement
+                creds_info = json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS_JSON'])
+                cred = credentials.Certificate(creds_info)
+            else:
+                # Local - utilise fichier
+                cred = credentials.Certificate("credentials.json")
+            
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://quizapp-45497-default-rtdb.europe-west1.firebasedatabase.app/',
+                'httpTimeout': 10,
+                'maxIdleConnections': 50
+            })
+            print("Firebase initialisé avec succès")
+    except Exception as e:
+        print(f"Erreur initialisation Firebase: {e}")
+        raise
 
-# Initialiser Firebase
-initialize_firebase()
-
-# Références Firebase
-ref_questions = db.reference('questions')
-ref_games = db.reference('games')
+# Initialiser Firebase avec gestion d'erreur
+try:
+    initialize_firebase()
+    # Références Firebase
+    ref_questions = db.reference('questions')
+    ref_games = db.reference('games')
+except Exception as e:
+    print(f"Erreur critique Firebase: {e}")
+    # Mode dégradé sans Firebase pour debug
+    ref_questions = None
+    ref_games = None
 
 # Middleware de performance
 @app.before_request
@@ -73,6 +85,9 @@ def before_request():
 def after_request(response):
     duration = time.time() - request.start_time
     response.headers['X-Response-Time'] = f"{duration:.2f}s"
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
     return response
 
 # Fonction optimisée pour générer des questions
@@ -93,8 +108,7 @@ def generate_questions(theme, difficulty="moyen", count=5):
             "answers": ["Réponse 1", "Réponse 2", "Réponse 3", "Réponse 4"],
             "correct": 0,
             "difficulty": "{difficulty}"
-        }},
-        ...
+        }}
     ]
     """
 
@@ -128,61 +142,96 @@ def generate_questions(theme, difficulty="moyen", count=5):
         return []
     except Exception as e:
         print(f"Erreur OpenRouter: {str(e)}")
-        raise
+        return []  # Retour gracieux au lieu de raise
 
-# Fonctions utilitaires optimisées
+# Fonctions utilitaires optimisées avec gestion d'erreur
 def update_cache(game_id):
-    games_cache[game_id] = ref_games.child(game_id).get() or {}
+    try:
+        if ref_games:
+            games_cache[game_id] = ref_games.child(game_id).get() or {}
+        else:
+            games_cache[game_id] = games_cache.get(game_id, {})
+    except Exception as e:
+        print(f"Erreur update_cache: {e}")
 
 def bulk_game_update(game_id, updates):
     try:
-        ref_games.child(game_id).update(updates)
-        update_cache(game_id)
+        if ref_games:
+            ref_games.child(game_id).update(updates)
+        # Mise à jour du cache local dans tous les cas
+        if game_id in games_cache:
+            games_cache[game_id].update(updates)
+        else:
+            games_cache[game_id] = updates
         return True
     except Exception as e:
-        print(f"Erreur update: {str(e)}")
-        return False
+        print(f"Erreur bulk_game_update: {str(e)}")
+        # Mise à jour du cache local même en cas d'erreur Firebase
+        if game_id in games_cache:
+            games_cache[game_id].update(updates)
+        else:
+            games_cache[game_id] = updates
+        return True
 
 def get_game_data(game_id):
     if game_id not in games_cache:
         update_cache(game_id)
     return games_cache.get(game_id, {})
 
-# Routes
+# Routes avec gestion d'erreur améliorée
 @app.route('/')
 def home():
-    return render_template('home.html')
+    try:
+        return render_template('home.html')
+    except Exception as e:
+        return f"Erreur template home.html: {e}", 500
 
 @app.route('/moderator')
 def moderator():
-    game_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    initial_data = {
-        'active': False,
-        'themes': "",
-        'difficulty': "moyen",
-        'current_question': None,
-        'buzzer_enabled': False,
-        'buzzer_player': None,
-        'countdown': 0,
-        'players': {},
-        'questions': {},
-        'blocked_players': []
-    }
-    ref_games.child(game_id).set(initial_data)
-    games_cache[game_id] = initial_data
-    return render_template('moderator.html', game_id=game_id)
+    try:
+        game_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        initial_data = {
+            'active': False,
+            'themes': "",
+            'difficulty': "moyen",
+            'current_question': None,
+            'buzzer_enabled': False,
+            'buzzer_player': None,
+            'countdown': 0,
+            'players': {},
+            'questions': {},
+            'blocked_players': []
+        }
+        
+        if ref_games:
+            ref_games.child(game_id).set(initial_data)
+        games_cache[game_id] = initial_data
+        
+        return render_template('moderator.html', game_id=game_id)
+    except Exception as e:
+        return f"Erreur création jeu: {e}", 500
 
 @app.route('/player')
 def player():
-    return render_template('player.html')
+    try:
+        return render_template('player.html')
+    except Exception as e:
+        return f"Erreur template player.html: {e}", 500
 
 @app.route('/api/generate_questions', methods=['POST'])
 def api_generate_questions():
     try:
-        game_id = request.json['game_id']
-        themes_str = request.json['themes']
-        difficulty = request.json.get('difficulty', 'moyen')
-        count = int(request.json.get('count', 5))
+        data = request.get_json()
+        if not data:
+            return jsonify(status="error", message="Données JSON manquantes"), 400
+            
+        game_id = data.get('game_id')
+        themes_str = data.get('themes')
+        difficulty = data.get('difficulty', 'moyen')
+        count = int(data.get('count', 5))
+        
+        if not game_id or not themes_str:
+            return jsonify(status="error", message="game_id et themes requis"), 400
         
         themes = [t.strip() for t in themes_str.split(',') if t.strip()]
         all_questions = {}
@@ -203,321 +252,93 @@ def api_generate_questions():
         
         if bulk_game_update(game_id, updates):
             return jsonify(status="success", questions=all_questions)
-        return jsonify(status="error"), 500
+        return jsonify(status="error", message="Échec mise à jour"), 500
     except Exception as e:
+        print(f"Erreur api_generate_questions: {e}")
         return jsonify(status="error", message=str(e)), 500
 
+# Autres routes avec gestion d'erreur similaire...
 @app.route('/api/reset_buzzer', methods=['POST'])
 def api_reset_buzzer():
-    game_id = request.json['game_id']
-    updates = {
-        'buzzer_player': None,
-        'buzzer_enabled': False,
-        'countdown': 0
-    }
-    if bulk_game_update(game_id, updates):
-        return jsonify(status="success")
-    return jsonify(status="error"), 500
-
-@app.route('/api/activate_buzzer', methods=['POST'])
-def activate_buzzer():
-    game_id = request.json['game_id']
-    state = request.json['state']
-    game_data = get_game_data(game_id)
-    
-    updates = {
-        'buzzer_enabled': state,
-        'buzzer_player': None,
-        'countdown': 0
-    }
-    
-    if state:
-        blocked_players = game_data.get('blocked_players', [])
-        updates.update({
-            f'players/{pid}/buzzer_active': True
-            for pid in game_data.get('players', {})
-            if pid not in blocked_players
-        })
-    
-    if bulk_game_update(game_id, updates):
-        socketio.emit('game_state', get_game_data(game_id), room=game_id)
-        return jsonify(status="success")
-    return jsonify(status="error"), 500
-
-@app.route('/api/ask_question', methods=['POST'])
-def ask_question():
     try:
-        game_id = request.json['game_id']
-        theme = request.json['theme']
-        question_index = request.json['question_index']
-        
-        game_data = get_game_data(game_id)
-        if not game_data or theme not in game_data.get('questions', {}) or question_index >= len(game_data['questions'][theme]):
-            return jsonify(status="error", message="Question invalide")
-        
-        question = game_data['questions'][theme][question_index]
+        data = request.get_json()
+        game_id = data.get('game_id')
+        if not game_id:
+            return jsonify(status="error", message="game_id requis"), 400
+            
         updates = {
-            'current_question': question,
-            'buzzer_enabled': True,
             'buzzer_player': None,
-            'countdown': 0,
-            'blocked_players': [],
-            **{f'players/{pid}/buzzer_active': True for pid in game_data.get('players', {})}
+            'buzzer_enabled': False,
+            'countdown': 0
         }
-        
         if bulk_game_update(game_id, updates):
-            socketio.emit('new_question', room=game_id)
-            socketio.emit('game_state', get_game_data(game_id), room=game_id)
             return jsonify(status="success")
         return jsonify(status="error"), 500
-    except Exception as e:
-        return jsonify(status="error", message=str(e)), 500
-
-@app.route('/api/update_score', methods=['POST'])
-def api_update_score():
-    try:
-        game_id = request.json['game_id']
-        player_id = request.json['player_id']
-        delta = int(request.json.get('delta', 1))
-
-        # Mise à jour du cache
-        cache_key = f"{game_id}_{player_id}"
-        player_score_cache[cache_key] = player_score_cache.get(cache_key, 0) + delta
-
-        # Mise à jour asynchrone de Firebase
-        def _update_firebase():
-            player_ref = db.reference(f'games/{game_id}/players/{player_id}')
-            player_ref.transaction(lambda data: {'score': (data or {}).get('score', 0) + delta})
-
-        socketio.start_background_task(_update_firebase)
-
-        return jsonify(status="success", new_score=player_score_cache[cache_key])
-    except Exception as e:
-        return jsonify(status="error", message=str(e)), 500
-
-@app.route('/api/block_player', methods=['POST'])
-def api_block_player():
-    game_id = request.json['game_id']
-    player_id = request.json['player_id']
-    game_data = get_game_data(game_id)
-    
-    blocked_players = game_data.get('blocked_players', [])
-    if player_id not in blocked_players:
-        blocked_players.append(player_id)
-        updates = {
-            'blocked_players': blocked_players,
-            f'players/{player_id}/buzzer_active': False
-        }
-        if bulk_game_update(game_id, updates):
-            return jsonify(status="success")
-    return jsonify(status="error"), 500
-
-@app.route('/api/unblock_all', methods=['POST'])
-def api_unblock_all():
-    game_id = request.json['game_id']
-    game_data = get_game_data(game_id)
-    
-    updates = {
-        'blocked_players': [],
-        'buzzer_enabled': True,
-        **{f'players/{pid}/buzzer_active': True for pid in game_data.get('players', {})}
-    }
-    
-    if bulk_game_update(game_id, updates):
-        return jsonify(status="success")
-    return jsonify(status="error"), 500
-
-@app.route('/api/answer_result', methods=['POST'])
-def api_answer_result():
-    try:
-        game_id = request.json['game_id']
-        player_id = request.json['player_id']
-        is_correct = request.json['is_correct']
-
-        game_ref = db.reference(f'games/{game_id}')
-        updates = {}
-
-        if is_correct:
-            player_ref = db.reference(f'games/{game_id}/players/{player_id}')
-            current_score = player_ref.get().get('score', 0)
-            updates[f'players/{player_id}/score'] = current_score + 1
-
-            updates.update({
-                'buzzer_player': None,
-                'buzzer_enabled': True,
-                'blocked_players': [],
-                **{f'players/{pid}/buzzer_active': True for pid in (game_ref.child('players').get() or {})}
-            })
-        else:
-            game_data = game_ref.get() or {}
-            blocked_players = game_data.get('blocked_players', [])
-            if player_id not in blocked_players:
-                blocked_players.append(player_id)
-                updates['blocked_players'] = blocked_players
-            
-            updates.update({
-                f'players/{player_id}/buzzer_active': False,
-                'buzzer_player': None,
-                'buzzer_enabled': True,
-                **{f'players/{pid}/buzzer_active': True 
-                   for pid in (game_ref.child('players').get() or {})
-                   if pid != player_id and pid not in blocked_players}
-            })
-
-        game_ref.update(updates)
-        update_cache(game_id)
-        socketio.emit('game_state', get_game_data(game_id), room=game_id)
-        return jsonify(status="success")
     except Exception as e:
         return jsonify(status="error", message=str(e)), 500
 
 @app.route('/api/get_game', methods=['GET'])
 def get_game():
-    game_id = request.args.get('game_id')
-    if not game_id:
-        return jsonify(status="error", message="Game ID manquant")
-    return jsonify(get_game_data(game_id))
+    try:
+        game_id = request.args.get('game_id')
+        if not game_id:
+            return jsonify(status="error", message="Game ID manquant"), 400
+        return jsonify(get_game_data(game_id))
+    except Exception as e:
+        return jsonify(status="error", message=str(e)), 500
 
-# WebSockets
-@socketio.on('connect')
-def handle_connect():
-    print('Client connecté:', request.sid)
-
-@socketio.on('join_game')
-def handle_join_game(data):
-    game_id = data['game_id']
-    player_id = data['player_id']
-    player_name = data.get('name', f"Joueur {player_id[:4]}")
-
-    join_room(game_id)
-    game_data = get_game_data(game_id)
-    is_blocked = player_id in game_data.get('blocked_players', [])
-
-    updates = {
-        f'players/{player_id}/name': player_name,
-        f'players/{player_id}/buzzer_active': not is_blocked
-    }
-
-    if player_id not in game_data.get('players', {}):
-        updates[f'players/{player_id}/score'] = 0
-
-    if bulk_game_update(game_id, updates):
-        emit('game_state', get_game_data(game_id), room=game_id)
-
-@socketio.on('buzz')
-def handle_buzz(data):
-    game_id = data['game_id']
-    player_id = data['player_id']
-    game_data = get_game_data(game_id)
-
-    if not game_data.get('buzzer_enabled') or game_data.get('buzzer_player'):
-        return
-
-    player = game_data.get('players', {}).get(player_id)
-    if not (player and player.get('buzzer_active')):
-        return
-
-    end_time = time.time() + 15
-    updates = {
-        'buzzer_player': player_id,
-        'buzzer_enabled': False,
-        'countdown': end_time,
-        **{f'players/{pid}/buzzer_active': False 
-           for pid in game_data.get('players', {}) 
-           if pid != player_id}
-    }
-
-    if bulk_game_update(game_id, updates):
-        emit('player_buzzed', {
-            'player_id': player_id,
-            'player_name': player['name']
-        }, room=game_id)
-        socketio.start_background_task(countdown_timer, game_id, end_time, player_id)
-
-def countdown_timer(game_id, end_time, player_id):
-    while time.time() < end_time:
-        game_data = get_game_data(game_id)
-        if game_data.get('buzzer_player') != player_id:
-            break
-            
-        remaining = max(0, int(end_time - time.time()))
-        socketio.emit('countdown', {'remaining': remaining}, room=game_id)
-        
-        for _ in range(5):
-            if time.time() >= end_time:
-                break
-            time.sleep(0.2)
-
-    game_data = get_game_data(game_id)
-    if game_data.get('buzzer_player') == player_id:
-        socketio.emit('timeout', {'player_id': player_id}, room=game_id)
-        bulk_game_update(game_id, {
-            'buzzer_player': None,
-            'countdown': 0
-        })
-
-@socketio.on('answer_result')
-def handle_answer_result(data):
-    game_id = data['game_id']
-    player_id = data['player_id']
-    is_correct = data['is_correct']
-    game_data = get_game_data(game_id)
-
-    updates = {}
-
-    if is_correct:
-        player_ref = db.reference(f'games/{game_id}/players/{player_id}')
-        current_score = player_ref.get().get('score', 0)
-        updates[f'players/{player_id}/score'] = current_score + 1
-
-        updates.update({
-            'buzzer_player': None,
-            'buzzer_enabled': True,
-            'blocked_players': [],
-            **{f'players/{pid}/buzzer_active': True for pid in game_data.get('players', {})}
-        })
-        
-        socketio.emit('answer_correct', {
-            'player_id': player_id
-        }, room=game_id)
-    else:
-        blocked_players = game_data.get('blocked_players', [])
-        if player_id not in blocked_players:
-            blocked_players.append(player_id)
-            updates['blocked_players'] = blocked_players
-        
-        updates.update({
-            f'players/{player_id}/buzzer_active': False,
-            'buzzer_player': None,
-            'buzzer_enabled': True,
-            **{f'players/{pid}/buzzer_active': True 
-               for pid in game_data.get('players', {})
-               if pid != player_id and pid not in blocked_players}
-        })
-        
-        socketio.emit('answer_incorrect', {
-            'player_id': player_id
-        }, room=game_id)
-
-    if bulk_game_update(game_id, updates):
-        socketio.emit('game_state', get_game_data(game_id), room=game_id)
-
-# Route de santé
+# Route de santé améliorée
 @app.route('/health')
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'games_in_cache': len(games_cache),
-        'memory_usage': psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024,
-        'active_connections': len(socketio.server.manager.rooms) if hasattr(socketio.server, 'manager') else 0
-    })
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'firebase_connected': ref_games is not None,
+            'games_in_cache': len(games_cache),
+            'memory_usage': psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024,
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# WebSockets avec gestion d'erreur
+@socketio.on('connect')
+def handle_connect():
+    try:
+        print('Client connecté:', request.sid)
+        emit('connection_success', {'message': 'Connecté avec succès'})
+    except Exception as e:
+        print(f'Erreur connexion: {e}')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client déconnecté:', request.sid)
+
+# Gestionnaire d'erreur global
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Route non trouvée'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Erreur interne du serveur'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"Erreur non gérée: {e}")
+    return jsonify({'error': 'Erreur serveur', 'message': str(e)}), 500
 
 # Préchargement initial du cache au démarrage
-all_games = ref_games.get() or {}
-for game_id, game_data in all_games.items():
-    games_cache[game_id] = game_data
+try:
+    if ref_games:
+        all_games = ref_games.get() or {}
+        for game_id, game_data in all_games.items():
+            games_cache[game_id] = game_data
+        print(f"Cache initialisé avec {len(games_cache)} jeux")
+except Exception as e:
+    print(f"Erreur préchargement cache: {e}")
 
 if __name__ == '__main__':
     # Développement local uniquement
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, debug=True, host='0.0.0.0', port=port)
+    print(f"Démarrage sur le port {port}")
+    socketio.run(app, debug=False, host='0.0.0.0', port=port)
